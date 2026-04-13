@@ -1,12 +1,9 @@
-from flask import Flask, request, jsonify, session, send_from_directory, abort
+from flask import Flask, request, jsonify, session, send_from_directory
 from flask_cors import CORS
 from database import db, User, VerificationCode, AppToken, Report
-from email_service import send_code, send_welcome
 from datetime import datetime, timedelta
 from functools import wraps
 import secrets, os, re
-
-import os
 
 app = Flask(__name__, static_folder='.')
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
@@ -19,7 +16,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///nomchat.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
-# Rate limiting (простой in-memory)
+# Rate limiting (simple in-memory)
 _rate = {}
 def rate_limit(key, max_calls=5, window=60):
     now = datetime.utcnow().timestamp()
@@ -50,7 +47,6 @@ with app.app_context():
             cur.execute("ALTER TABLE users ADD COLUMN is_banned BOOLEAN DEFAULT 0 NOT NULL")
             print('[NOMCHAT] Migration: added is_banned column')
         else:
-            # Fix NULL values — set to 0
             cur.execute("UPDATE users SET is_banned = 0 WHERE is_banned IS NULL")
         if 'is_support' not in existing:
             cur.execute("ALTER TABLE users ADD COLUMN is_support BOOLEAN DEFAULT 0")
@@ -68,6 +64,7 @@ with app.app_context():
         conn.close()
     except Exception as e:
         print(f'[NOMCHAT] Migration warning: {e}')
+
     # Auto-create special accounts
     admin_email   = os.environ.get('ADMIN_EMAIL', 'admin@nomchat.id')
     dev_email     = 'nomchat@nom.ru'
@@ -109,6 +106,7 @@ def admin_required(f):
     return decorated
 
 # ── Static ────────────────────────────────────────────────────
+
 @app.route('/')
 def index():
     return send_from_directory('.', 'index.html')
@@ -123,7 +121,6 @@ def docs_files(filename):
 
 @app.route('/<path:filename>')
 def static_files(filename):
-    return send_from_directory('.', filename)
     return send_from_directory('.', filename)
 
 # ── Auth API ──────────────────────────────────────────────────
@@ -147,12 +144,7 @@ def api_send_code():
     db.session.add(VerificationCode(email=email, code=code, expires_at=expires))
     db.session.commit()
 
-    sent = send_code(email, code)
-    return jsonify({
-        'success':   True,
-        'demo_code': None if sent else code,
-        'message':   'Code sent' if sent else 'Demo mode'
-    })
+    return jsonify({'success': True, 'demo_code': code})
 
 @app.route('/api/auth/verify', methods=['POST'])
 def api_verify():
@@ -174,25 +166,20 @@ def api_verify():
         db.session.delete(vc); db.session.commit()
         return jsonify({'error': 'Code expired'}), 400
     db.session.delete(vc)
+
     user = User.query.filter_by(email=email).first()
     is_new = user is None
     if not user:
         user = User(email=email, username=email.split('@')[0])
         db.session.add(user)
+
     # Auto-assign special roles
     if email == 'nomchat@nom.ru' and not user.is_dev:
         user.is_dev = True
     if email == 'creator@nom.ru' and not user.is_creator:
         user.is_creator = True
-    user.last_login = datetime.utcnow()
-    db.session.commit()
 
-    # Send welcome email to new users (async-style, don't block)
-    if is_new:
-        try:
-            send_welcome(email, user.username)
-        except Exception:
-            passatetime.utcnow()
+    user.last_login = datetime.utcnow()
     db.session.commit()
 
     # Block banned users
@@ -219,11 +206,10 @@ def api_logout():
     session.clear()
     return jsonify({'success': True})
 
-# ── Nomchat ID Token API (для внешних приложений) ─────────────
+# ── Nomchat ID Token API ──────────────────────────────────────
 
 @app.route('/api/auth/token/issue', methods=['POST'])
 def api_issue_token():
-    """Выдать временный токен для внешнего приложения после верификации"""
     uid = session.get('user_id')
     if not uid:
         return jsonify({'error': 'Unauthorized'}), 401
@@ -231,13 +217,11 @@ def api_issue_token():
     if not user:
         return jsonify({'error': 'User not found'}), 404
 
-    data = request.get_json(silent=True) or {}
+    data   = request.get_json(silent=True) or {}
     app_id = data.get('app_id', 'unknown')
-
-    token = secrets.token_urlsafe(32)
+    token  = secrets.token_urlsafe(32)
     expires = datetime.utcnow() + timedelta(minutes=5)
 
-    # Сохраняем токен в БД
     existing = AppToken.query.filter_by(user_id=user.id, app_id=app_id).first()
     if existing:
         existing.token = token
@@ -250,9 +234,8 @@ def api_issue_token():
 
 @app.route('/api/auth/token/verify', methods=['POST'])
 def api_verify_token():
-    """Проверить токен от внешнего приложения"""
-    data = request.get_json(silent=True) or {}
-    token = data.get('token', '')
+    data   = request.get_json(silent=True) or {}
+    token  = data.get('token', '')
     app_id = data.get('app_id', 'unknown')
 
     if not token:
@@ -262,18 +245,14 @@ def api_verify_token():
     if not at:
         return jsonify({'error': 'Invalid token'}), 401
     if at.expires_at < datetime.utcnow():
-        db.session.delete(at)
-        db.session.commit()
+        db.session.delete(at); db.session.commit()
         return jsonify({'error': 'Token expired'}), 401
 
     user = User.query.get(at.user_id)
     if not user:
         return jsonify({'error': 'User not found'}), 404
 
-    # Токен одноразовый — удаляем после использования
-    db.session.delete(at)
-    db.session.commit()
-
+    db.session.delete(at); db.session.commit()
     return jsonify({'success': True, 'user': user.to_dict()})
 
 # ── User API ──────────────────────────────────────────────────
@@ -312,7 +291,7 @@ def delete_account(uid, user):
 @admin_required
 def admin_stats(admin):
     return jsonify({
-        'users': User.query.count(),
+        'users':  User.query.count(),
         'admins': User.query.filter_by(is_admin=True).count(),
     })
 
@@ -346,8 +325,8 @@ def admin_set_role(uid, admin):
     data = request.get_json(silent=True) or {}
     role = data.get('role')
     val  = data.get('value', True)
-    if role == 'dev':     u.is_dev     = val
-    elif role == 'admin': u.is_admin   = val
+    if role == 'dev':       u.is_dev     = val
+    elif role == 'admin':   u.is_admin   = val
     elif role == 'creator': u.is_creator = val
     db.session.commit()
     return jsonify(u.to_dict())
@@ -402,7 +381,6 @@ def creator_required(f):
             return jsonify({'error': 'Forbidden'}), 403
         return f(*args, **kwargs)
     return decorated
-
 
 def support_required(f):
     @wraps(f)
@@ -489,26 +467,22 @@ def creator_status():
 @app.before_request
 def check_site_disabled():
     path = request.path
-    # Always allow special pages and assets
     always_allowed = ['/api/dev/', '/api/creator/', '/api/auth/me', '/api/auth/logout',
                       '/offline.html', '/maintenance.html', '/dev.html', '/creator.html',
                       '/main.css', '/login.css']
     if any(path.startswith(a) for a in always_allowed): return None
     if path.endswith(('.css', '.js', '.png', '.ico', '.svg')): return None
 
-    # Check full disable
     if _site_disabled:
         if 'text/html' in request.headers.get('Accept', ''):
             return send_from_directory('.', 'offline.html')
         return jsonify({'error': 'Site disabled', 'code': 35092}), 503
 
-    # Check maintenance — allow admins, devs, creators through
     if _maintenance_mode:
         uid  = session.get('user_id')
         user = User.query.get(uid) if uid else None
         if user and (user.is_admin or user.is_dev or user.is_creator or user.email == DEV_EMAIL):
             return None
-        # Allow login page so staff can sign in
         if path in ['/', '/login.html', '/api/auth/send-code', '/api/auth/verify']:
             return None
         if 'text/html' in request.headers.get('Accept', ''):
@@ -520,7 +494,7 @@ def check_site_disabled():
 @app.route('/api/reports', methods=['POST'])
 @login_required
 def submit_report(user):
-    data = request.get_json(silent=True) or {}
+    data     = request.get_json(silent=True) or {}
     subject  = data.get('subject', '').strip()[:200]
     message  = data.get('message', '').strip()
     category = data.get('category', 'general')
@@ -533,8 +507,7 @@ def submit_report(user):
         category       = category,
         message        = message
     )
-    db.session.add(report)
-    db.session.commit()
+    db.session.add(report); db.session.commit()
     return jsonify({'success': True, 'id': report.id})
 
 @app.route('/api/reports', methods=['GET'])
@@ -556,8 +529,7 @@ def get_report(rid):
 def respond_report(rid):
     r    = Report.query.get_or_404(rid)
     data = request.get_json(silent=True) or {}
-    uid  = session.get('user_id')
-    me   = User.query.get(uid)
+    me   = User.query.get(session.get('user_id'))
     r.response    = data.get('response', '').strip()
     r.status      = data.get('status', 'resolved')
     r.resolved_by = me.email
