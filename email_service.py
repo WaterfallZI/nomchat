@@ -4,8 +4,8 @@ from email.mime.text import MIMEText
 
 EMAIL_HOST     = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT     = int(os.environ.get('EMAIL_PORT', '587'))
-EMAIL_USER     = os.environ.get('EMAIL_USER', '')
-EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
+EMAIL_USER     = os.environ.get('nomchat@nom.ru', '')
+EMAIL_PASSWORD = os.environ.get('hwcc kdtr lzch onbw', '')
 EMAIL_FROM     = os.environ.get('EMAIL_FROM', f'Nomchat ID <{EMAIL_USER}>')
 
 def send_code(to_email: str, code: str) -> bool:
