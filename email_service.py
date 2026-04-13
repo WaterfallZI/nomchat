@@ -95,7 +95,7 @@ def send_code(to_email: str, code: str) -> bool:
 
         print(f'[NOMCHAT EMAIL] Sent to {to_email}')
         return True
-    except Exception as e:
+    except (Exception, SystemExit) as e:
         print(f'[NOMCHAT EMAIL] Error: {e}')
         return False
 
