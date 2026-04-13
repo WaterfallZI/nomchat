@@ -19,8 +19,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///nomchat.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
-# Rate limiting (простой in-memory)//github.com/faraonextazzy938-sys/nomchat-docs.git
-git push -u origin master
+# Rate limiting (простой in-memory)
 _rate = {}
 def rate_limit(key, max_calls=5, window=60):
     now = datetime.utcnow().timestamp()
