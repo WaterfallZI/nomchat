@@ -1,4 +1,4 @@
-import smtplib, os, ssl
+﻿import smtplib, os, ssl
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -86,7 +86,7 @@ def send_code(to_email: str, code: str) -> bool:
         msg.attach(MIMEText(html, 'html', 'utf-8'))
 
         ctx = ssl.create_default_context()
-        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as smtp:
+        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT, timeout=10) as smtp:
             smtp.ehlo()
             smtp.starttls(context=ctx)
             smtp.ehlo()
@@ -95,7 +95,7 @@ def send_code(to_email: str, code: str) -> bool:
 
         print(f'[NOMCHAT EMAIL] Sent to {to_email}')
         return True
-    except (Exception, SystemExit) as e:
+    except BaseException as e:
         print(f'[NOMCHAT EMAIL] Error: {e}')
         return False
 
@@ -195,7 +195,7 @@ def send_welcome(to_email: str, username: str) -> bool:
         msg.attach(MIMEText(html, 'html', 'utf-8'))
 
         ctx = ssl.create_default_context()
-        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as smtp:
+        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT, timeout=10) as smtp:
             smtp.ehlo(); smtp.starttls(context=ctx); smtp.ehlo()
             smtp.login(EMAIL_USER, EMAIL_PASSWORD)
             smtp.sendmail(EMAIL_USER, to_email, msg.as_string())
