@@ -2,14 +2,13 @@ import smtplib, os, ssl
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-EMAIL_HOST     = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
-EMAIL_PORT     = int(os.environ.get('EMAIL_PORT', '587'))
-EMAIL_USER     = os.environ.get('nomchat@nom.ru', '')
-EMAIL_PASSWORD = os.environ.get('hwcc kdtr lzch onbw', '')
-EMAIL_FROM     = os.environ.get('EMAIL_FROM', f'Nomchat ID <{EMAIL_USER}>')
-
 def send_code(to_email: str, code: str) -> bool:
-    """Send verification code. Returns True if sent via SMTP, False if demo mode."""
+    EMAIL_USER     = os.environ.get('EMAIL_USER', '')
+    EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
+    EMAIL_HOST     = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+    EMAIL_PORT     = int(os.environ.get('EMAIL_PORT', '587'))
+    EMAIL_FROM     = f'Nomchat ID <{EMAIL_USER}>'
+
     if not EMAIL_USER or not EMAIL_PASSWORD:
         print(f'[NOMCHAT EMAIL] Demo mode — code for {to_email}: {code}')
         return False
@@ -102,7 +101,12 @@ def send_code(to_email: str, code: str) -> bool:
 
 
 def send_welcome(to_email: str, username: str) -> bool:
-    """Send welcome email to new user."""
+    EMAIL_USER     = os.environ.get('EMAIL_USER', '')
+    EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
+    EMAIL_HOST     = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+    EMAIL_PORT     = int(os.environ.get('EMAIL_PORT', '587'))
+    EMAIL_FROM     = f'Nomchat ID <{EMAIL_USER}>'
+
     if not EMAIL_USER or not EMAIL_PASSWORD:
         print(f'[NOMCHAT EMAIL] Demo mode — welcome for {to_email}')
         return False
